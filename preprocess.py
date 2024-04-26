@@ -1,6 +1,7 @@
 import pandas as pd 
 import re
 from Config import *
+from sklearn.preprocessing import LabelEncoder
 
 
 def load_data():
@@ -11,9 +12,21 @@ def preprocess_data(df):
     df =  __de_duplication(df)
     # remove noise in input data
     df = __noise_remover(df)
-    # translate data to english
-    # df[Config.TICKET_SUMMARY] = translate_to_en(df[Config.TICKET_SUMMARY].tolist())
     return df
+
+def prepare_for_training(data):
+    ticket_sumary = Config.TICKET_SUMMARY
+    interaction_content = Config.INTERACTION_CONTENT
+    data = data[[ticket_sumary, interaction_content, Config.GROUPED, Config.CLASS_COL_2, Config.CLASS_COL_3, Config.CLASS_COL_4]].dropna()
+    # Concatenate text columns for TF-IDF vectorization
+    data[Config.COMBINE_TEXT] = data[ticket_sumary] + " " + data[interaction_content]
+    return data
+
+def get_encodings(data):
+    label_encoders = {col: LabelEncoder() for col in [Config.GROUPED] + Config.TYPE_COLS}
+    for col in label_encoders:
+        data[col] = label_encoders[col].fit_transform(data[col])
+    return label_encoders
 
 def __get_input_data()->pd.DataFrame:
     df1 = pd.read_csv("data_raw//AppGallery.csv", skipinitialspace=True)
@@ -25,20 +38,6 @@ def __get_input_data()->pd.DataFrame:
     df[Config.TICKET_SUMMARY] = df[Config.TICKET_SUMMARY].values.astype('U')
     df["y"] = df[Config.CLASS_COL_2]
     return df.loc[(df["y"] != '') & (~df["y"].isna()),]
-
-def prepare_for_training(data):
-    data = data[['Ticket Summary', 'Interaction content', 'y1', 'y2', 'y3', 'y4']].dropna()
-
-    # Concatenate text columns for TF-IDF vectorization
-    data['combined_text'] = data['Ticket Summary'] + " " + data['Interaction content']
-    return data
-
-def get_encodings(data):
-    from sklearn.preprocessing import LabelEncoder
-    label_encoders = {col: LabelEncoder() for col in ['y1', 'y2', 'y3', 'y4']}
-    for col in label_encoders:
-        data[col] = label_encoders[col].fit_transform(data[col])
-    return label_encoders
 
 def __de_duplication(data: pd.DataFrame):
     data["ic_deduplicated"] = ""
@@ -179,69 +178,10 @@ def __noise_remover(df: pd.DataFrame):
         "[^0-9a-zA-Z]+",
         "(\s|^).(\s|$)"]
     for noise in noise_1:
-        #print(noise)
         df[Config.INTERACTION_CONTENT] = df[Config.INTERACTION_CONTENT].replace(noise, " ", regex=True)
     df[Config.INTERACTION_CONTENT] = df[Config.INTERACTION_CONTENT].replace(r'\s+', ' ', regex=True).str.strip()
-    #print(df.y1.value_counts())
     good_y1 = df.y1.value_counts()[df.y1.value_counts() > 10].index
     df = df.loc[df.y1.isin(good_y1)]
-    #print(df.shape)
-    df.to_csv('data_cleaned/cleaned.csv')
+    df.to_csv('data_cleaned/cleaned.csv')  # Save locally
     return df
 
-def translate_to_en(texts:list[str]):
-    import stanza
-    from stanza.pipeline.core import DownloadMethod
-    from transformers import pipeline
-    from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
-
-    t2t_m = "facebook/m2m100_418M"
-    t2t_pipe = pipeline(task='text2text-generation', model=t2t_m)
-
-    model = M2M100ForConditionalGeneration.from_pretrained(t2t_m)
-    tokenizer = M2M100Tokenizer.from_pretrained(t2t_m)
-
-    nlp_stanza = stanza.Pipeline(lang="multilingual", processors="langid",
-                                 download_method=DownloadMethod.REUSE_RESOURCES)
-    text_en_l = []
-    for text in texts:
-        if text == "":
-            text_en_l = text_en_l + [text]
-            continue
-
-        doc = nlp_stanza(text)
-        #print(doc.lang)
-        if doc.lang == "en":
-            text_en_l = text_en_l + [text]
-            # print(text)
-        else:
-            # convert to model supported language code
-            # https://stanfordnlp.github.io/stanza/available_models.html
-            # https://github.com/huggingface/transformers/blob/main/src/transformers/models/m2m_100/tokenization_m2m_100.py
-            lang = doc.lang
-            if lang == "fro":  # fro = Old French
-                lang = "fr"
-            elif lang == "la":  # latin
-                lang = "it"
-            elif lang == "nn":  # Norwegian (Nynorsk)
-                lang = "no"
-            elif lang == "kmr":  # Kurmanji
-                lang = "tr"
-
-            case = 2
-
-            if case == 1:
-                text_en = t2t_pipe(text, forced_bos_token_id=t2t_pipe.tokenizer.get_lang_id(lang='en'))
-                text_en = text_en[0]['generated_text']
-            elif case == 2:
-                tokenizer.src_lang = lang
-                encoded_hi = tokenizer(text, return_tensors="pt")
-                generated_tokens = model.generate(**encoded_hi, forced_bos_token_id=tokenizer.get_lang_id("en"))
-                text_en = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
-                text_en = text_en[0]
-            else:
-                text_en = text
-            text_en_l = text_en_l + [text_en]
-            #print(text)
-            #print(text_en)
-    return text_en_l

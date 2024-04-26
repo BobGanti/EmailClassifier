@@ -2,6 +2,7 @@ class Config:
     # Input Columns
     TICKET_SUMMARY = 'Ticket Summary'
     INTERACTION_CONTENT = 'Interaction content'
+    COMBINE_TEXT = 'combine_text'
 
     # Type Columns to test
     TYPE_COLS = ['y2', 'y3', 'y4']
