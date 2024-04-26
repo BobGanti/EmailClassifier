@@ -35,3 +35,15 @@ Run: python main.py
 
 ## License
 MIT License
+
+<br><br>
+
+<div>
+  <p><strong><span style="font-size:50px;">CLASSIFICATION REPORTS</span></strong></p>
+  <img src="https://github.com/BobGanti/EmailClassifier/assets/29084030/d5a5dff5-d2d1-4b75-aff9-77601df6f4b8" width=300px /> 
+  <img src="https://github.com/BobGanti/EmailClassifier/assets/29084030/ef810480-d0cd-460f-8864-03f6a704d6bd" width=300px /> 
+  <img src="https://github.com/BobGanti/EmailClassifier/assets/29084030/41e5ae52-6f0b-4c08-b412-be7da12a2da8" width=300px />
+</div>
+
+
+
